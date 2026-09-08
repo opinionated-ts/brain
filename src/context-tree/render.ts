@@ -51,11 +51,16 @@ export function renderTreeToString(root: TreeNode, options: RenderOptions = {}):
  * when available.
  */
 export function renderTreeToCompactString(root: TreeNode): string {
-  const flat = Array.from(collectAllNodes(root)).filter((n) => n.depth > 0);
-  const lines = flat.map((n) => {
-    const desc = n.description ? ` — ${n.description}` : "";
-    return `${n.path}${desc}`;
-  });
+  const flat = Array.from(collectAllNodes(root)).filter(
+    (n) => n.depth > 0 && (n.description || n.children.size > 0),
+  );
+
+  const lines = flat
+    .filter((n) => n.description)
+    .map((n) => {
+      const desc = ` — ${n.description}`;
+      return `${n.path}${desc}`;
+    });
 
   return lines.join("\n");
 }

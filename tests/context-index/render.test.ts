@@ -2,7 +2,12 @@ import { describe, expect, it } from "bun:test";
 
 import type { ContextIndexEntry } from "@/context-tree/types";
 
-import { renderTreeToString, renderTreeToMarkdown, renderTreeToJSON } from "@/context-tree/render";
+import {
+  renderTreeToString,
+  renderTreeToCompactString,
+  renderTreeToMarkdown,
+  renderTreeToJSON,
+} from "@/context-tree/render";
 import { buildContextTree } from "@/context-tree/tree";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -158,6 +163,99 @@ describe("renderTreeToMarkdown", () => {
     expect(md).toContain("### `src`");
     // Empty description node should not have a heading
     expect(md).not.toMatch(/### `empty`/);
+  });
+});
+
+// ── renderTreeToCompactString ───────────────────────────────────────
+describe("renderTreeToCompactString", () => {
+  it("returns empty string for empty tree", () => {
+    const tree = build([]);
+    const output = renderTreeToCompactString(tree);
+
+    expect(output).toBe("");
+  });
+
+  it("returns empty string when root has no described children", () => {
+    const tree = build([entry({ folderPath: "src", description: "" })]);
+    const output = renderTreeToCompactString(tree);
+
+    expect(output).toBe("");
+  });
+
+  it("renders single node with description", () => {
+    const tree = build([entry({ folderPath: "src", description: "Source code" })]);
+    const output = renderTreeToCompactString(tree);
+
+    expect(output).toBe("src — Source code");
+  });
+
+  it("excludes nodes without descriptions", () => {
+    const tree = build([
+      entry({ folderPath: "src", description: "Source" }),
+      entry({ folderPath: "empty", description: "" }),
+      entry({ folderPath: "other", description: "Other stuff" }),
+    ]);
+    const output = renderTreeToCompactString(tree);
+
+    expect(output).toContain("src — Source");
+    expect(output).toContain("other — Other stuff");
+    expect(output).not.toContain("empty");
+  });
+
+  it("excludes intermediate folders without descriptions even if they have children", () => {
+    const tree = build([
+      entry({ folderPath: "src", description: "" }),
+      entry({ folderPath: "src/context-tree", description: "Context tree impl" }),
+    ]);
+    const output = renderTreeToCompactString(tree);
+
+    // src should not appear because it has no description
+    expect(output).not.toContain("src —");
+    expect(output).toContain("src/context-tree — Context tree impl");
+  });
+
+  it("renders multiple entries on separate lines", () => {
+    const tree = build([
+      entry({ folderPath: "scripts", description: "Maintenance scripts" }),
+      entry({ folderPath: "skills", description: "Reusable skills" }),
+      entry({ folderPath: "src", description: "Source code" }),
+    ]);
+    const output = renderTreeToCompactString(tree);
+    const lines = output.split("\n").filter(Boolean);
+
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe("scripts — Maintenance scripts");
+    expect(lines[1]).toBe("skills — Reusable skills");
+    expect(lines[2]).toBe("src — Source code");
+  });
+
+  it("renders nested structure with descriptions", () => {
+    const tree = build([
+      entry({ folderPath: "src", description: "Source" }),
+      entry({ folderPath: "src/context-tree", description: "Context tree impl" }),
+      entry({ folderPath: "src/utils", description: "Utilities" }),
+    ]);
+    const output = renderTreeToCompactString(tree);
+    const lines = output.split("\n").filter(Boolean);
+
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("src — Source");
+    expect(lines[1]).toContain("src/context-tree — Context tree impl");
+    expect(lines[2]).toContain("src/utils — Utilities");
+  });
+
+  it("does not include nodes with children but no description", () => {
+    const tree = build([
+      entry({ folderPath: "src", description: "" }),
+      entry({ folderPath: "src/context-tree", description: "Has desc" }),
+      entry({ folderPath: "src/utils", description: "" }),
+    ]);
+    const output = renderTreeToCompactString(tree);
+
+    // src should not appear at all (no description)
+    expect(output).not.toMatch(/^src —/m);
+    // Only src/context-tree should appear
+    expect(output).toBe("src/context-tree — Has desc");
   });
 });
 

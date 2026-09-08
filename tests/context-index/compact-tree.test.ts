@@ -27,16 +27,19 @@ describe("compact-tree format", () => {
     expect(lines).toContain("src/utils — Utils");
   });
 
-  it("omits em-dash when description is empty", async () => {
+  it("excludes folders without descriptions", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "ct-"));
 
+    writeIndex(join(tmp, "with-desc"), "Has description");
     writeIndex(join(tmp, "empty"));
+    writeIndex(join(tmp, "another-with-desc"), "Also has desc");
 
     const out = await generateContextTree({ root: tmp, format: "compact-tree" });
     const lines = out.split("\n").filter(Boolean);
 
-    // Should list the folder but not include an em-dash
-    expect(lines).toContain("empty");
-    expect(lines.some((l) => l.includes("empty —"))).toBe(false);
+    // Should only include folders with descriptions
+    expect(lines).toContain("with-desc — Has description");
+    expect(lines).toContain("another-with-desc — Also has desc");
+    expect(lines.some((l) => l.includes("empty"))).toBe(false);
   });
 });
