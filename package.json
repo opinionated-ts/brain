@@ -18,7 +18,8 @@
     "hooks:install": "lefthook install"
   },
   "dependencies": {
-    "citty": "^0.2.2"
+    "citty": "^0.2.2",
+    "ignore": "^7.0.9"
   },
   "devDependencies": {
     "@opinionated-ts/config": "^1.8.8",
