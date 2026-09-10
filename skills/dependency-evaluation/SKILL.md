@@ -1,282 +1,225 @@
 ---
 name: dependency-evaluation
-description: Determine whether an external dependency is necessary and, when it is, identify and compare viable candidates based on existing solutions, project fit, stability, transparency, documentation, activity, adoption, security, and context-specific footprint.
+description: Determine whether an external dependency is necessary and, when it is, identify and compare viable candidates based on existing solutions, implementation cost, project fit, stability, transparency, documentation, activity, adoption, security, and context-specific footprint.
 ---
 
 # Dependency Evaluation
 
 Use this skill whenever a task may require a library, package, framework, plugin, utility, or other external dependency.
 
-> First find out whether the problem is already solved. Add a dependency only when its value clearly outweighs its engineering and maintenance cost.
+> Determine the best practical solution before deciding ownership. Prefer an existing adequate solution, but never assume “existing” means local. Adopt a dependency when its value outweighs its engineering, maintenance, security, and performance cost.
 
-Never assume a dependency is necessary before researching what already exists.
+Never assume a dependency is necessary or that local implementation is preferable merely because it is possible. Compare realistic alternatives.
 
 ## 1. Understand the Requirement
 
 Determine:
 
 - execution context: server, web/client, CLI, build, test, library, or mixed;
-- required behavior, constraints, scale, compatibility, and security sensitivity;
-- performance sensitivity;
-- whether the functionality is one-off or likely to recur.
+- required behavior, constraints, scale, compatibility, security/performance sensitivity;
+- recurrence, edge cases, extensibility/future capability;
+- approximate implementation complexity and testing burden.
 
 Do not evaluate solutions against an unclear problem.
 
-## 2. Find an Existing Solution First
+Split materially different tasks and evaluate them independently. Afterward, determine whether one solution can coherently cover multiple tasks without unnecessary complexity or unacceptable trade-offs. Do not combine unrelated capabilities merely to reduce dependency count.
 
-Search in this order:
+## 2. Inventory Existing Solutions
+
+Check in this order:
 
 1. language/platform/runtime APIs;
 2. current project code;
-3. local utilities/helpers;
+3. local helpers/utilities;
 4. internal abstractions/services;
 5. installed dependencies;
-6. another package in the workspace/monorepo;
-7. previously used solutions elsewhere in the repository;
-8. existing framework/toolchain conventions or utilities;
-9. only then, new external dependencies.
+6. workspace/monorepo packages;
+7. previously used repository solutions;
+8. framework/toolchain conventions/utilities;
+9. external ecosystem packages.
 
-A solution does not need to be a dedicated package. A small, proven local helper may be preferable to adding one.
+This is an **inventory, not a local-first preference**.
 
-If an existing solution adequately solves the requirement, use it and stop. Do not replace it simply because a package exists.
+Distinguish between:
 
-## 3. Decompose the Work
+- an existing implementation that already solves the requirement;
+- an existing primitive requiring substantial implementation;
+- a local implementation from scratch;
+- mature external solutions.
 
-When the requirement contains multiple materially different tasks, split them into independent tasks before researching dependencies.
+If an existing implementation adequately solves the requirement with reasonable complexity and maintenance cost, use it and stop unless comparison is specifically useful. Never reject an external solution merely because local implementation is possible.
 
-Examples: parsing, validation, serialization, caching, filesystem access, process execution, formatting, networking.
+## 3. Compare Ownership Cost
 
-Evaluate each task independently: a package that is excellent for one task is not automatically the best for another.
+Before choosing local or external ownership, assess:
 
-Afterward, check whether one candidate can coherently cover multiple tasks without unnecessary complexity or unacceptable trade-offs.
+- algorithmic complexity and interacting features;
+- edge cases, testing, correctness risk;
+- performance tuning;
+- API design and interoperability;
+- maintenance burden;
+- future extensibility and likely feature growth.
 
-## 4. Research Before Deciding
+Local ownership is attractive when behavior is small, well understood, stable, and cheap to test/maintain. External solutions become more attractive as functionality becomes broad, mature, algorithmically non-trivial, edge-case-heavy, specialized, or likely to grow.
 
-For every task without an adequate existing solution, research the ecosystem first.
+“We can implement it ourselves” is never sufficient justification. Compare **total engineering cost**, not dependency count.
 
-Search broadly enough to identify the largest practical set of relevant candidates, not just the first package found.
+## 4. Research the Ecosystem
 
-For each candidate, verify as much as possible through primary sources:
+For every task without an adequate existing solution, research broadly across applicable categories:
 
-- official repository;
-- official documentation;
-- package registry/metadata;
-- changelog and releases;
-- issues and pull requests;
+- runtime/platform capability;
+- existing project/local implementation;
+- installed dependency reuse;
+- extension of an existing abstraction;
+- specialized external package;
+- broader external package covering multiple needs coherently;
+- custom implementation.
+
+Search by the underlying capability, algorithms, architecture, and constraints—not only package names. Do not stop at the first popular package or first local implementation, and do not conclude that no dependency is needed merely because no package is immediately known.
+
+For serious external candidates, verify important claims through primary sources where possible:
+
+- official repository/documentation;
+- registry/package metadata;
+- changelogs/releases;
+- issues/PRs;
 - maintainer/governance information;
 - security advisories;
 - bundle-size data when relevant.
 
-Use secondary sources for discovery, then verify important claims with primary sources.
+Use secondary sources for discovery and primary sources for important verification.
 
-Do not conclude that no dependency is needed merely because no package is immediately known.
+## 5. Evaluate Project Fit
 
-## 5. Project Alignment
+Evaluate every realistic solution against the actual project's philosophy, stack, architecture, and constraints:
 
-Evaluate each candidate against the actual project's philosophy, stack, architecture, and constraints.
-
-Consider:
-
-- modernity and maintenance standards;
+- modernity/maintenance standards;
 - runtime compatibility;
-- TypeScript/type-safety quality;
+- TypeScript/type safety;
 - performance;
 - security;
 - API ergonomics/design;
-- module format and tree-shaking;
+- module format/tree-shaking;
 - browser/server compatibility;
 - dependency footprint;
 - licensing/distribution constraints;
-- project conventions.
+- project conventions;
+- implementation/maintenance cost.
 
-Also evaluate architectural fit where relevant. For example:
+Also assess architectural fit where relevant:
 
-- a public library with a deliberately small API → penalize candidates whose types/abstractions would leak into the public API;
-- plugin-oriented architecture → favor composable primitives over candidates that take control of the lifecycle;
-- explicit error-handling conventions → favor compatible error models rather than forcing a different flow;
-- dependency-injection architecture → penalize hidden global state/process-wide singletons that hurt composition or testing;
-- deliberate ownership of abstractions → favor solutions that do not create another permanent architectural boundary.
+- public libraries should avoid leaking unwanted abstractions/types into their API;
+- plugin architectures favor composable primitives over lifecycle control;
+- explicit error-handling conventions favor compatible error models;
+- dependency injection disfavors hidden global state/singletons;
+- deliberate abstraction ownership disfavors unnecessary permanent boundaries;
+- complex specialized functionality should not be reimplemented locally when that creates substantial long-term ownership.
 
-These examples illustrate alignment; they are not mandatory criteria. Actual project constraints take precedence.
+These are alignment considerations, not mandatory criteria; actual project constraints take precedence. Always explain **how well each solution aligns and why**.
 
-Always explain **how well each candidate aligns and why**.
-
-## 6. Context-Specific Preference
+## 6. Context-Specific Rules
 
 ### Server
 
-Prefer broader, coherent functionality when:
+Broader coherent functionality is a positive secondary factor when related capabilities may be useful later, the extra surface has no disproportionate maintenance/security/performance cost, and it can avoid multiple overlapping dependencies.
 
-- related capabilities may be useful later;
-- the extra surface does not create disproportionate maintenance, security, or performance cost;
-- it can avoid multiple overlapping dependencies.
-
-Future usefulness is secondary and cannot rescue a poor candidate.
+Future usefulness cannot rescue a poor candidate. Do not prefer local implementation merely because bundle size is irrelevant.
 
 ### Web / Client
 
-Prefer the smallest dependency that adequately solves the task.
+Prefer the smallest adequate solution, local or external.
 
-Bundle impact is important. Evaluate:
+Evaluate:
 
-- minified size;
-- compressed size when available;
+- minified and compressed size when available;
 - browser-specific entry points;
-- tree-shakability;
-- whether unused functionality can actually be removed;
+- tree-shakability and actual removal of unused functionality;
 - transitive dependencies;
 - client suitability.
 
-Always show package-size information when trustworthy data exists. Useful sources include Bundlephobia and published package/build metadata. State the source, version, and measurement context when possible.
-
-Do not use raw install size as a substitute for client bundle impact.
+Always show trustworthy package-size data with source, version, and measurement context when possible. Evaluate **bundle impact, not raw install size**.
 
 ## 7. Candidate Scorecard
 
-Every viable candidate gets a **0–10 score for each applicable criterion**, with evidence-based justification.
+Every viable external candidate receives a **0–10 score for every applicable criterion**, with evidence-based justification.
+
+When local, runtime, or project-owned solutions are materially competitive, evaluate their engineering trade-offs alongside external candidates rather than assuming they win.
 
 ### Alignment
 
-Fit with the project's philosophy, stack, architecture, and constraints.
+Fit with project philosophy, stack, architecture, and constraints.
 
-- 9–10: natural fit, little/no compromise
-- 7–8: good fit, minor trade-offs
-- 4–6: usable, meaningful mismatch
-- 0–3: conflicts with project goals
+- **9–10:** natural fit, little/no compromise
+- **7–8:** good fit, minor trade-offs
+- **4–6:** usable, meaningful mismatch
+- **0–3:** conflicts with project goals
 
 ### Stability
 
-How responsibly the project manages change and breaking changes.
+Assess how responsibly changes and breaking changes are managed: versioning discipline, compatibility policy, migration guidance, changelogs/releases, deprecations, breaking-change frequency/magnitude, and how major changes are explained and managed.
 
-Consider:
-
-- versioning discipline;
-- compatibility policy;
-- migration guides;
-- changelogs/release notes;
-- deprecations;
-- frequency/magnitude of breaking changes;
-- explanation and management of major changes.
-
-Volatility is acceptable when it is controlled, documented, and justified.
+Volatility is acceptable when controlled, documented, and justified.
 
 ### Popularity
 
-Treat adoption as a signal, not proof of quality.
-
-**>1,000 GitHub stars is preferred but optional.** Low stars should not heavily penalize a candidate when every other criterion is exceptionally strong.
-
-Consider real ecosystem usage where measurable; stars alone can mislead.
+Adoption is a signal, not proof of quality. **>1,000 GitHub stars is preferred but optional**; low stars should not heavily penalize an otherwise exceptional candidate. Consider measurable real ecosystem usage.
 
 ### Transparency
 
-Determine whether maintainers confront problems openly.
+Assess whether maintainers openly address problems through issue/PR discussions, security advisories, changelogs, postmortems/incidents, bug responses, and explanations for reversions, removals, or breaking changes.
 
-Inspect:
+Investigate suspicious gaps such as disappearing issue numbers, deleted references, unavailable problem reports, unexplained removals, or changes apparently erasing evidence of known problems. Do not infer intentional concealment merely because content is unavailable; report only verifiable evidence and label uncertainty.
 
-- issue/PR discussions;
-- security advisories;
-- changelogs;
-- postmortems/incidents;
-- maintainer responses to serious bugs;
-- explanations for reversions, removals, or breaking changes.
-
-Investigate suspicious gaps such as:
-
-- disappearing issue numbers;
-- references to deleted discussions/issues;
-- PRs referring to unavailable problem reports;
-- unexplained removals;
-- changes that appear to erase evidence of known problems.
-
-Do not infer intentional concealment merely because content is unavailable. Report only verifiable evidence and label uncertainty.
-
-Strong transparency means a pattern of openly addressing problems, documenting decisions, and communicating limitations.
+Strong transparency means openly addressing problems, documenting decisions, and communicating limitations.
 
 ### Documentation
 
-Evaluate how easily the package can be discovered, understood, and used correctly.
+Assess whether the package can be discovered, understood, and used correctly: installation, quick start, API reference, configuration, common/advanced use cases, migrations/breaking changes, troubleshooting, environment constraints, and applicable examples.
 
-Where applicable, check:
-
-- installation;
-- quick start;
-- API reference;
-- configuration;
-- common/advanced use cases;
-- migration/breaking changes;
-- troubleshooting;
-- runtime/environment constraints;
-- examples.
-
-Prefer navigable, accurate documentation over documentation that is merely large.
+Prefer accurate, navigable documentation over documentation that is merely large.
 
 ### Activity
 
-Evaluate active and sustainable maintenance.
+Assess active, sustainable maintenance. Ideal signals include multiple meaningfully involved maintainers/contributors, maintenance within the last **6 months**, ongoing issue/PR activity, and continued releases.
 
-Ideal signals:
-
-- more than one meaningfully involved maintainer/contributor;
-- maintenance activity within the last **6 months**;
-- ongoing issue/PR activity;
-- releases showing continued maintenance.
-
-Do not equate raw commit frequency with health; mature stable projects may commit less often.
+Do not equate raw commit frequency with project health; mature stable projects may commit less often.
 
 ### Bundle Size / Client Footprint
 
-Strongly apply to browser/client dependencies and lightly or not at all to server-only dependencies.
-
-Consider:
-
-- minified/compressed size;
-- tree-shaking;
-- entry points;
-- transitive client dependencies;
-- whether the footprint is justified.
-
-Always show measurable size data for client candidates.
+Apply strongly to browser/client dependencies and lightly or not at all to server-only dependencies. Consider minified/compressed size, tree-shaking, entry points, transitive client dependencies, and whether the footprint is justified. Show measurable size data for client candidates.
 
 ## 8. Security
 
-Security is always part of the evaluation and can override an otherwise strong result.
+Security is always part of the evaluation and may override an otherwise strong result.
 
-For security-sensitive candidates—such as those handling sensitive data, networking, untrusted input, authentication, cryptography, or sandboxing—investigate:
-
-- known vulnerabilities;
-- advisories;
-- affected versions;
-- remediation status;
-- dependency vulnerabilities;
-- security-response practices.
+For security-sensitive candidates—especially sensitive data, networking, untrusted input, authentication, cryptography, or sandboxing—investigate vulnerabilities, advisories, affected versions, remediation status, dependency vulnerabilities, and security-response practices.
 
 A known unresolved high-impact vulnerability should normally disqualify a candidate unless there is a compelling documented reason and mitigation.
 
 “No known vulnerabilities found” does not mean “secure.”
 
-## 9. Dependency Bloat
+## 9. Eliminate Dependency Bloat
 
-Reject a dependency when:
+Reject an external dependency when:
 
 - the runtime already provides an adequate solution;
-- an existing project dependency already does;
-- a small, well-tested local helper is clearly sufficient;
+- an existing project dependency does;
+- a genuinely small, well-tested local implementation is clearly sufficient;
 - it adds substantial unrelated functionality without meaningful benefit;
 - it duplicates existing capabilities;
-- its maintenance/security cost is disproportionate to the task.
+- its maintenance/security cost is disproportionate.
 
-Do not automatically prefer fewer dependencies. Choose the best total engineering trade-off.
+However, never automatically prefer local code or fewer dependencies. A dependency may be justified when it replaces substantial implementation effort, mature algorithms, broad edge-case handling, ongoing maintenance, or specialized expertise.
+
+Choose the best **total cost of ownership**.
 
 ## 10. Evidence
 
-Collect enough evidence to support every score.
-
-Useful evidence includes:
+Collect enough evidence to support every score and major decision. Useful evidence includes:
 
 - current version and release date;
-- release cadence;
-- breaking-change history;
+- release cadence and breaking-change history;
 - maintenance/contributor activity;
 - adoption/stars;
 - issue/PR handling;
@@ -284,36 +227,37 @@ Useful evidence includes:
 - documentation coverage;
 - bundle-size measurements;
 - dependency/transitive footprint;
-- target-environment compatibility.
+- target-environment compatibility;
+- estimated local implementation complexity.
 
 Record important dates explicitly.
 
-When information is unavailable, write **Unknown** rather than guessing.
+When information is unavailable, write **Unknown** rather than guessing. When sources disagree, report the discrepancy and prefer the most authoritative/current source.
 
-When sources disagree, report the discrepancy and prefer the most authoritative/current source.
-
-## 11. Research Strategy
+## 11. Research Workflow
 
 For each independent task:
 
-1. identify relevant solution categories/approaches;
-2. discover a broad candidate set;
-3. eliminate clearly incompatible or abandoned candidates;
-4. verify remaining candidates through primary sources;
-5. inspect stability, transparency, activity, documentation, adoption, security, and footprint;
-6. measure client bundle impact when applicable;
-7. score every viable candidate;
-8. recommend the strongest options while preserving credible alternatives.
-
-Do not stop at the first popular package and do not search only by package name; search by the underlying task and its constraints.
+1. understand requirements and constraints;
+2. inventory existing solutions across runtime, project, dependencies, workspace, and ecosystem;
+3. estimate local implementation complexity and long-term ownership;
+4. identify relevant solution categories;
+5. discover a broad candidate set;
+6. eliminate clearly incompatible or abandoned candidates;
+7. verify serious external candidates through primary sources;
+8. evaluate fit, stability, transparency, activity, documentation, adoption, security, and footprint;
+9. measure client bundle impact when applicable;
+10. compare local versus external total engineering cost;
+11. score every viable external candidate;
+12. recommend the strongest option while preserving credible alternatives.
 
 ## 12. Final Response
 
-Use this structure:
+Use this structure.
 
 ### Existing Solution
 
-State whether the functionality already exists in the runtime, project, workspace, dependencies, or ecosystem already in use.
+State whether the requirement already exists in the runtime, project, workspace, installed dependencies, or ecosystem. Distinguish existing implementations, reusable primitives, local-from-scratch options, and mature external solutions.
 
 If an adequate existing solution exists, identify it, explain why it is sufficient, recommend it, and stop unless comparison is specifically useful.
 
@@ -321,22 +265,30 @@ If an adequate existing solution exists, identify it, explain why it is sufficie
 
 List the independent tasks discovered.
 
+### Solution Approaches
+
+For each task, show applicable:
+
+- existing/local;
+- reuse;
+- extension;
+- external dependency;
+- custom implementation.
+
+Explain major trade-offs before selecting a winner.
+
 ### Candidates by Task
 
-Show relevant candidates and major trade-offs for each task.
+Show relevant external candidates and their major trade-offs for each task.
 
 ### Scorecard
 
-Give every viable candidate a justified 0–10 score for every applicable criterion.
-
-Suggested table:
+Give every viable external candidate a justified **0–10 score for every applicable criterion**:
 
 | Candidate | Alignment | Stability | Popularity | Transparency | Documentation | Activity | Bundle Size* | Notes |
 | --------- | --------: | --------: | ---------: | -----------: | ------------: | -------: | -----------: | ----- |
 
-`*` Especially important for web/client projects; use `N/A` when irrelevant.
-
-An overall score may be used as a secondary aid, never instead of individual scores and justifications.
+Use `N/A` when bundle size is irrelevant. An overall score may be used only as a secondary aid, never instead of individual scores and justifications.
 
 ### Default Weights
 
@@ -366,11 +318,13 @@ Adjust weights when the project explicitly prioritizes something else and explai
 
 State:
 
-- strongest option;
+- strongest solution overall;
 - why it fits best;
+- local or external ownership;
 - main downside;
 - strongest alternative;
-- when that alternative is preferable.
+- when that alternative is preferable;
+- why the chosen ownership model has the better total engineering trade-off.
 
 ### User Choice
 
@@ -378,19 +332,25 @@ Show all strong viable alternatives. Do not hide them because one is preferred.
 
 ## Rules
 
-- Check for an existing solution before any new dependency.
-- Never assume a dependency is necessary before research.
-- Decompose multi-part work and research tasks independently.
-- Research multiple candidates before choosing.
+- Check existing solutions before creating/adopting anything new.
+- “Existing solution first” **does not mean “local implementation first.”**
+- Never assume a dependency is necessary or local implementation preferable.
+- Decompose materially different work and evaluate tasks independently.
+- Estimate local complexity and long-term ownership before choosing.
+- Research multiple solution categories and candidates.
 - Evaluate actual project fit, not generic package quality.
+- Compare total engineering/maintenance cost, not dependency count.
+- Evaluate complex, mature, specialized functionality seriously instead of reflexively reimplementing it.
 - For clients, bundle size is a major criterion and must be shown when measurable.
 - For servers, broader coherent functionality is a positive secondary factor when its cost is reasonable.
-- 1k stars is preferred, never mandatory.
+- > 1k stars is preferred, never mandatory.
 - Stability means controlled, documented change—not simply age.
-- Investigate transparency seriously, including suspicious missing/deleted issue evidence where relevant, without inventing intent.
+- Investigate transparency, including suspicious missing/deleted issue evidence where relevant, without inventing intent.
 - Prefer primary sources for important claims.
-- Explicitly state unknowns.
-- Scores require justification.
+- Explicitly state unknowns and discrepancies.
+- Every score requires justification.
 - Security can override an otherwise strong result.
 - Give the user all strong options, not only the favorite.
 - Never recommend a new dependency when an adequate existing solution already exists.
+- Never recommend local implementation solely because no dependency is strictly required.
+- Choose the solution with the best overall engineering trade-off.
