@@ -4,8 +4,6 @@ name: Commit Instructions
 description: "Instructions for creating commits in this repository"
 ---
 
----
-
 # Commit instructions for this repository
 
 ## Atomic commits
@@ -37,8 +35,11 @@ description: "Instructions for creating commits in this repository"
 
 - Before creating or suggesting a commit, read and follow `.agents/skills/conventional-commit-message/SKILL.md`.
 - Do not duplicate or override the commit-message rules defined by that skill.
-- Let the skill determine the commit type, scope, subject, body, footers, and release impact.
+- Let the skill determine the commit type, scope, subject, body, and footers.
 - If the skill requires repository-specific information, inspect the repository as instructed by the skill.
+- Use backticks around important technical terms, identifiers, commands, files, APIs, and concepts when appropriate.
+- Follow Conventional Commits when selecting the commit type. Use `feat` only when introducing a new externally consumable or user-visible feature, such as a new public API, CLI capability, or other functionality intended for consumers.
+- When adding a new internal subfeature, implementation capability, helper, or component that exists only to support another feature and is not itself part of the public API or externally consumable behavior, prefer `chore(scope)` over `feat(scope)`.
 
 ## Scope discipline
 
