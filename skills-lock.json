@@ -5,7 +5,7 @@
       "source": "opinionated-ts/ai-context-tree",
       "sourceType": "github",
       "skillPath": "skills/context-tree/SKILL.md",
-      "computedHash": "145c39e8be892fd3e46b2bdeed45e76a70ac43d99fd06ccf90444f227ffa9e81"
+      "computedHash": "29929e5a5822def3dd7ee5031577a9754ec9494116bde4ed3ff8822c39beccb6"
     },
     "conventional-commit-message": {
       "source": "conventional-changelog/conventional-changelog",
