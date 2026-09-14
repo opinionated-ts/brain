@@ -140,3 +140,4 @@ AGENTS.md
 .vscode/mcp.json
 .cursor/mcp.json
 # <<< universal-ai-config <<<
+.opinion/skills/
