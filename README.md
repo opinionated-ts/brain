@@ -12,25 +12,26 @@ As the [Opinionated TS](https://github.com/opinionated-ts) ecosystem evolves int
 
 ## Skills
 
-### `dependency-evaluation`
+For now, this package only contains skills for AI coding agents, which are:
 
-Helps determine whether an external dependency is actually needed and, when it is, evaluates viable alternatives based on:
+- **Self-contained skills** — bundled in this repository.
+- **Opinionated TS ecosystem skills** — maintained in other packages of the [Opinionated TS](https://github.com/opinionated-ts) organization.
 
-- existing project and runtime solutions;
-- implementation and maintenance cost;
-- project and architectural fit;
-- stability and activity;
-- documentation and transparency;
-- security;
-- dependency and bundle footprint.
+### Self-contained skills
 
-The goal is to make the best engineering trade-off for the project rather than simply minimizing or maximizing dependencies.
+These skills are installable via `npx skills add opinionated-ts/brain`:
+
+- [`dependency-evaluation`](https://github.com/opinionated-ts/brain/tree/main/skills/dependency-evaluation) — Helps determine whether an external dependency is actually needed and, when it is, evaluates viable alternatives.
+- [`instruction-design`](https://github.com/opinionated-ts/brain/tree/main/skills/instruction-design) — Designs, writes, reviews, or restructures instructions that an AI will execute.
+
+### Opinionated TS ecosystem skills
+
+- [`context-tree`](https://github.com/opinionated-ts/ai-context-tree) — Gives humans and AI coding agents a map of where relevant information lives in a repository.
 
 ## Related Projects
 
 - [`template`](https://github.com/opinionated-ts/template) — Opinionated foundation for TypeScript projects.
 - [`config`](https://github.com/opinionated-ts/config) — Shared development configuration for Opinionated TS projects.
-- [`ai-context-tree`](https://github.com/opinionated-ts/ai-context-tree) — Gives humans and AI coding agents a map of where relevant information lives in a repository.
 
 ## License
 
