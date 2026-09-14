@@ -1,7 +1,7 @@
 ---
-applyTo: "**"
-name: Commit Instructions
+name: Commit Guide
 description: "Instructions for creating commits in this repository"
+alwaysApply: true
 ---
 
 # Commit instructions for this repository
