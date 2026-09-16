@@ -1,210 +1,625 @@
 ---
 name: instruction-design
-description: 'Design, write, review, or restructure instructions that an AI/LLM will execute — skills (SKILL.md), prompts, system prompts, agent instruction files (AGENTS.md, CLAUDE.md), rules, workflows, AI-facing documentation, tool instructions, and operational playbooks. Trigger whenever the user wants an AI to follow a procedure, or asks to draft, improve, or review instructions, prompts, skills, or rules — even when they don’t say "skill" or "prompt" explicitly (phrases like "instrucciones para el agente", "docs para la IA", "system prompt", "reglas para el bot", "quiero que la IA haga X paso a paso" all qualify). Apply this skill instead of generic prompt-writing advice: it encodes a specific philosophy — maximum determinism, non-blocking happy path with error handling deferred to separate files, and branch-based file structure.'
+description: "Design, write, review, and restructure AI-facing instructions with explicit state, decision boundaries, validation, escalation, and deterministic execution. This skill covers skills, prompts, system prompts, AGENTS.md, CLAUDE.md, operational playbooks, structured procedures, branching workflows, and troubleshooting flows. It is optimized for execution reliability, progressive disclosure, and unambiguous decision-making."
 ---
 
-# Instruction Design
+# Instruction Design v2
 
-Instructions written for an AI are not read the way humans read documentation: the AI executes literally, doesn't skim, and can't ask a colleague when something is ambiguous. Every rule in this skill follows from that single fact.
+Instructions for an AI are not normal documentation. They are executable decision systems. The goal is not to write prose that is merely readable; it is to reduce the number of inferences the agent must make from missing context.
 
-## The one question that drives everything
+This skill replaces the loose heuristic model with a more explicit operating model: every step must define state, action, success condition, branching, and return point.
 
-Before writing anything, understand the task well enough to answer two questions:
+## Execution model
 
-- **What is the trunk?** — the single path that covers most invocations, assuming things work.
-- **What are the branches?** — the different tools, formats, and conditions that split off it.
+Treat an instruction set as a graph of decisions and actions.
 
-That split is the backbone of everything that follows.
+For every step, the agent should be able to determine:
 
-## 1. Prefer determinism over interpretation
+1. the required preconditions;
+2. the action to perform;
+3. the authoritative inputs;
+4. the success condition;
+5. the postconditions after success;
+6. the branch or stop condition if the result differs;
+7. where execution continues or terminates.
 
-Write instructions as steps the agent can follow without judgment calls: what to check, in what order, what the exact output looks like. When two phrasings could both technically satisfy an instruction, prefer the one that admits only one way to comply.
+If a step does not make these explicit, it is not deterministic enough.
 
-Bad (interpretation required):
+## 1. Determinism is both linguistic and operational
 
-> Build the project using the configured build command.
+Determinism has two dimensions:
 
-Good (explicit):
+- Linguistic determinism: the wording has one intended interpretation.
+- Operational determinism: the same project state leads to the same action when the instruction is executed.
 
-> Read `config.json`. Use the `build` field as the command to execute, and run it from the repository root.
+A sentence can be precise but still nondeterministic in practice. Examples:
 
-### Intentional flexibility is not ambiguity
+- "Choose the best candidate."
+- "Use the latest version."
+- "Pick the most relevant file."
+- "Fix the issue."
+- "Use an available tool."
 
-Sometimes ambiguity is correct — not an oversight. The clearest case: several tools or resources could each satisfy a need and you don't want to hardcode one. There, name the _criteria_ the tool must meet, not a specific tool.
+These are not executable rules until the selection criteria are explicitly defined.
 
-- **Rigid (wrong when you don't actually need one specific tool):** "Fetch the page with `curl`."
-- **Deliberately open (right when any HTTP client works):** "Fetch the page with whatever HTTP tool is available that can issue GET requests."
+### Tie-breaking rules
 
-**Rule of thumb:** if you can picture a concrete right answer, write it down explicitly. If you genuinely don't care which of several valid options gets picked, say so explicitly too — "any of X, Y, or Z" is still deterministic; it simply names an equivalence class. What is never acceptable is silence that reads as ambiguity by accident: it forces the agent to guess, and different runs will guess differently.
+Whenever the instruction uses terms such as best, first, preferred, relevant, matching, available, latest, nearest, primary, or similar, define the ranking rule or tie-breaker.
 
-## 2. Design around the primary execution path
+**Anti-pattern:** unspecified tie-breaking.
 
-Optimize for the path the agent follows most of the time. The main document holds the central path — start, inspect, decide, act, validate, finish — and nothing else.
+**Rule:** if multiple candidates match, identify the ranking in order, for example:
 
-Before keeping a paragraph in the main instructions, ask: _is this required for the agent to complete the common path?_ The main path contains required context, required decisions, required actions, required validation, and links to relevant branches — not every piece of knowledge related to the task.
+1. exact filename match;
+2. same directory;
+3. nearest parent directory;
+4. lexical path order;
+5. explicit user preference when supplied;
+6. otherwise stop and report the ambiguity.
 
-Do not place every exception, edge case, implementation variant, or troubleshooting scenario inside that path. The agent should be able to complete the common task without reading information that is irrelevant to it.
+Never allow the agent to silently choose by convenience or first-seen order.
 
-## 3. Defer recovery and conditional knowledge
+## 2. Define state boundaries
 
-Write the trunk _assuming success_ — the tool exists, the file is there, the API responds, the dependency is installed. Add **one global notice** at the top of the trunk (or of each section/path that needs it), and never repeat it per command:
+For any consequential step, define the state contract:
 
-> **If anything below fails with an error that isn't clear enough to be sure of the cause, or you need more detail about the error**, read `references/troubleshooting.md`.
+- Preconditions: what must already be true.
+- Action: what the agent does.
+- Postconditions: what becomes true if successful.
+- Invariants: what must not change.
+- Idempotency: whether repeating the step is safe.
 
-After that notice, write the steps freely and ignore it — the notice alone covers every command below it, so the steps never mention fixes, solutions, or recovery. If a command fails, the agent already knows to read the troubleshooting file instead of improvising a fix from the error text.
+Use all five when the step mutates files, dependencies, infrastructure, configuration, repositories, or external systems. For trivial read-only steps, the minimum useful state check may be shorter.
 
-The troubleshooting file holds **one entry per problem** (see `references/troubleshooting.md` for the structure). The trunk carries only the trigger condition at the point where it's first relevant; all problem details live in the linked file.
+### Example
 
-**Inline exception:** if a problem can be explained shorter than the link that would defer it, explain it inline instead. General rule: **never create a reference file for a decision that fits in one line of the trunk** — a link is only worth it when it defers more content than it costs.
+```markdown
+## Step 3: Generate the config
 
-The same principle generalizes beyond errors: **anything that is a conditional possibility rather than the normal case** — an optional mode, a rare input shape, an edge case that applies "if X" — does not belong inline in the trunk. It goes in its own file, referenced only where it becomes relevant.
-
-See `references/error-appendix-pattern.md` for a worked example of this deferral.
-
-## 4. One file per branch
-
-If the instructions cover more than one materially different path, do not write one long file interleaving all of them with conditionals. Split by branch, physically, into separate files, and link between them at the exact point where the paths diverge.
-
-- Keep shared steps before and after the fork in the trunk; never duplicate them inside branch files.
-- At the divergence point, write the condition and the link together: "If the target is AWS, read `references/aws.md`. If it's GCP, read `references/gcp.md`."
-- Folder shape is flexible (flat `references/`, nested by domain); what's non-negotiable is that the trunk stays free of branch-specific detail and every branch file is reachable from exactly one clear link.
-- A small fork inside an already-scoped branch file is fine — split into a new file only when the divergence produces a genuinely different set of steps.
-
-See `references/branching-structure.md` for a worked example.
-
-## 5. Write operational language
-
-Prefer verbs that describe observable actions: read, inspect, determine, select, run, create, update, verify, compare, continue, stop.
-
-Avoid instructions whose operational meaning depends on interpretation: "handle appropriately", "use your judgment", "do what is necessary", "make sure everything works", "fix as needed". Use them only when the intended judgment itself is part of the task.
-
-State the _why_ of a non-obvious rule in one clause rather than relying on bare MUST/NEVER — an agent that understands the reason generalizes better to cases you didn't anticipate.
-
-## 6. Define decision boundaries and stopping conditions
-
-- **Decisions:** whenever an instruction contains a decision, make the condition explicit. Prefer "If X is true, do A. Otherwise, do B." over "Depending on the situation, choose A or B."
-- **Stopping conditions:** the agent must know when the task is complete. State what confirms success, when execution stops, when validation is required, and when it should enter a troubleshooting branch.
-
-> The task is complete when the generated file exists and the validation command exits successfully.
-
-## 7. Validate the result, not just the action
-
-Wherever practical, include a verification step: `action → validation`, not `action → assume success`.
-
-Validation must be explicit and observable — a command exits successfully, an expected file exists, an expected field has the expected value, generated output matches the required structure, a test suite passes.
-
-## 8. Handle failures with the smallest structure that works
-
-Not every failure needs its own branch. See section 3 for when recovery gets deferred to a linked file; this section covers the structure of the failure handling itself.
-
-- **Known failure classes** get explicit recovery: if A → recover with procedure A; if B → recover with procedure B; otherwise → read the troubleshooting document.
-- **Poorly understood failures:** "If the result cannot be explained from the current instructions, stop making assumptions and read `troubleshooting.md`." Never encourage speculative recovery when the available information is insufficient.
-
-**Troubleshooting documents should be diagnostic**, not lists of random fixes: symptom → diagnostic check → identified cause → recovery → return to main path. Each entry needs a diagnostic check that separates the causes of the same symptom (see `references/troubleshooting.md` for the template and rules).
-
-## 9. Keep the main path small
-
-When multiple paths share information, define the shared rule once and reference it; duplicated instructions drift.
-
-If the instructions are short and single-path, sections 3 and 4 may simply not apply — don't force a branch split or an error appendix where there is nothing to split or defer. The philosophy exists to keep genuinely complex instructions navigable; it isn't a checklist to pad a simple one.
-
----
-
-## Authoring procedure
-
-Follow this sequence when creating or restructuring instructions.
-
-1. **Identify the task** — determine exactly what the agent must accomplish.
-2. **Define the successful path** — write only the sequence required for the common successful execution.
-3. **Resolve ambiguity** — for every step, state what is done, what input it uses, what output is expected, and what determines the next step, unless flexibility is intentional.
-4. **Identify intentional choices** — where multiple implementations are valid, replace arbitrary tool selection with explicit selection criteria.
-5. **Identify branches** — find every condition that materially changes the path; move substantial branches into separate documents (section 4).
-6. **Identify conditional knowledge** — move information that is useful only under specific circumstances into a document that states exactly when it must be read (section 3).
-7. **Add recovery gates** — for dependencies, tools, files, or assumptions that may be unavailable, add a short instruction covering what failure looks like, when to read the recovery document, and where it lives. Do not preload the recovery content (section 3).
-8. **Add validation** — define how the agent knows the current step and the whole task succeeded (section 7).
-9. **Run the review pass** — for every paragraph ask "would the agent need this if nothing unusual happened?" (section 2) and move out anything that fails the test, then check every section of this skill against the draft (see the review pass below).
-
----
-
-## Review pass before you're done
-
-Read the draft back as an agent executing the normal path, and check each rule of this skill against it — section by section:
-
-1. **Determinism** (section 1) — find every place a step could be read two ways. Is the ambiguity intentional (tool-agnostic by design)? If not, make it explicit.
-2. **Flow** (sections 2–3) — find every step that assumes something might not hold. Confirm the trunk states the assumption plainly and defers the "what if not" to a linked file, rather than handling it inline.
-3. **Structure** (section 4) — find every point where the task could fork. Confirm each fork is a link to a separate file, not an inline conditional block, and that the trunk doesn't carry branch-specific detail past the point where it should have handed off.
-4. **Failure handling** (sections 3 and 8) — broken assumptions don't block the common path; failure states have a clear recovery entry point; unknown failures don't encourage guessing.
-5. **Context efficiency** (sections 2 and 9) — every section in the main path is required for normal execution; additional documents are read only when relevant.
-
-Sections that don't apply to a short, single-path instruction set are fine — the review is only about whether the sections that _do_ apply were followed.
-
----
-
-## Anti-patterns
-
-Avoid these unless there is a specific reason to use them:
-
-- **Giant instruction files** — one document containing the normal path, every alternative, every edge case, and all troubleshooting.
-- **Premature troubleshooting** — forcing the agent to read failure documentation before attempting the normal path.
-- **Unspecified branching** — "depending on the situation" without defining the conditions.
-- **Arbitrary tool mandates** — requiring one tool when the actual requirement is a capability several tools satisfy.
-- **Hidden assumptions** — relying on the agent to infer dependencies, file locations, ordering, or decision criteria.
-- **Conditional links without conditions** — pointing to documents without stating when they apply.
-- **Branches embedded in prose** — combining execution paths into long paragraphs instead of making the decision structure explicit.
-- **Redundant knowledge** — repeating the same rule across files instead of defining it once and referencing it.
-
----
-
-## Output format and when to use it
-
-Use this skill whenever you need to create, write, review, or restructure any of these:
-
-- instructions for AI agents that must work reliably
-- skills, prompts, system prompts, AGENTS.md / CLAUDE.md, rules, or workflows
-- setup guides and operational playbooks across environments
-- procedures where error handling matters but shouldn't obstruct the main flow
-- instruction sets that have grown tangled
-
-Instructions follow this shape:
-
+**Preconditions:** the schema file exists and the project root is known.
+**Action:** read `schema.json` and generate `config.generated.json` from it.
+**Postconditions:** the generated file exists and contains valid JSON.
+**Invariant:** the source schema file remains unchanged.
+**Idempotency:** rerunning this step overwrites the generated file with the same content, which is safe.
 ```
+
+## 3. Source of truth and normalization
+
+When a step depends on project information, the authoritative source must be explicit.
+
+### Source of truth
+
+Prefer the most authoritative source in this order:
+
+1. explicit project file;
+2. explicit configuration field;
+3. command output from the current environment;
+4. user-provided input;
+5. external source, only when explicitly required.
+
+Do not leave it to the agent to infer which source is authoritative when multiple sources may disagree.
+
+If two sources disagree, the instructions must say which one wins or instruct the agent to stop and report the conflict.
+
+### Normalize inputs before branching
+
+When equivalent inputs can appear in different representations, normalize them before making decisions.
+
+Examples:
+
+- uppercase vs. lowercase;
+- `./path` vs `path`;
+- trailing slashes in URLs;
+- empty string vs. null;
+- singular vs. plural values;
+- aliases and synonyms.
+
+**Rule:** normalize first, then branch on the canonical representation.
+
+### Tool capability constraints
+
+When tool choice is intentionally open, specify the minimum capabilities the selected tool must support.
+
+Example:
+
+- must issue authenticated GET requests;
+- must preserve headers;
+- must expose response status and body;
+- must run from the project environment.
+
+A rule such as "use any HTTP tool available" is not operationally deterministic unless the required capabilities are named.
+
+## 4. Instruction precedence and hidden defaults
+
+When multiple instructions can define behavior, the real precedence model must be respected.
+
+The common hierarchy is:
+
+1. platform- or environment-level constraints;
+2. system instructions;
+3. developer instructions;
+4. repository instructions;
+5. skill instructions;
+6. task-specific instructions;
+7. runtime outputs or generated state.
+
+Do not resolve conflicts by whichever instruction is later, more specific, or more verbose. If the platform defines precedence differently, follow the platform model and reference it instead of re-defining it.
+
+### Hidden defaults
+
+Do not rely on unstated defaults for:
+
+- working directories;
+- package managers;
+- shell type;
+- OS behavior;
+- credentials;
+- file encodings;
+- time zones;
+- network access;
+- versions;
+- output formats;
+- environment assumptions.
+
+When a default is intentionally relied upon, state it explicitly.
+
+### Environment assumptions
+
+For every required command or operation, ensure the execution environment is either explicitly defined or determined from project configuration.
+
+Do not assume a shell, OS, package manager, binary availability, or working directory unless the target environment guarantees it.
+
+### Artifact contract
+
+When an instruction creates or modifies an artifact, define the required postcondition:
+
+- location;
+- format;
+- required content;
+- prohibited content;
+- overwrite behavior;
+- naming and encoding rules.
+
+This is especially important for generated files, JSON/YAML, reports, code generation, documentation, and configuration output.
+
+## 5. Decision types must be explicit
+
+Represent each decision in one explicit form.
+
+- Binary: if X, do A; otherwise do B.
+- Multi-way: if X, do A; if Y, do B; otherwise do C.
+- Priority: evaluate A, then B, then C; select the first match.
+- Fallback: try A; if condition X occurs, use B.
+- Loop: repeat while condition X remains true; stop when Y occurs.
+- Approval: stop and request human approval when X occurs.
+- Delegation: hand off to another agent or tool with a defined contract.
+- Termination: stop execution when a terminal condition is reached.
+
+### Preserve resolved decisions
+
+Once the trunk resolves a decision, downstream references must consume that decision rather than re-deriving it.
+
+Do not ask the agent to rediscover the same fact from another source unless the state may legitimately have changed.
+
+### Branch completeness
+
+For every decision:
+
+- Mutual exclusivity: at most one branch should match, unless priority is explicitly defined.
+- Exhaustiveness: every valid state should map to a branch or an explicit stop/escalation condition.
+
+If multiple branches can match, define the priority or make the branches mutually exclusive.
+
+### Scope boundaries
+
+At the top of a branch or reference file, define what it covers and what it does not cover.
+
+```markdown
+## Scope
+
+This file covers only the PostgreSQL-specific configuration steps.
+It does not cover backup, restore, or migration procedures; those remain in the main instructions or a separate reference.
+```
+
+This reduces accidental duplication and cross-branch leakage.
+
+## 6. Keep the trunk small, but split only when needed
+
+Use a small happy-path trunk and defer the rest.
+
+The main document should contain the common execution path: what must happen in the normal case, what success looks like, and where to go if a material variant applies.
+
+### Separate materially different execution paths
+
+Split a document into a branch file only when at least one of these is true:
+
+- the branch has materially different actions;
+- the branch has materially different validation;
+- the branch has enough detail to obscure the trunk;
+- the branch has an independent maintenance cadence;
+- the branch introduces a different model, tool, or environment.
+
+Do not split when:
+
+- only a few commands differ;
+- the differences can be expressed in one deterministic condition;
+- splitting would create more navigation cost than context savings.
+
+### Reference depth and navigation cost
+
+Progressive disclosure should reduce irrelevant context without creating a navigation maze.
+
+Prefer:
+
+- shallow link chains;
+- direct next-decision links;
+- branch files that capture the full procedure for their scope.
+
+Avoid forcing an agent to traverse `SKILL.md → branch.md → sub-branch.md → troubleshooting.md` before the first actionable step.
+
+## 7. Link contracts and return points
+
+Every branch or reference link should answer four questions:
+
+1. When should this file be read?
+2. Why is it relevant?
+3. What does it contain?
+4. Where does execution resume after reading it?
+
+### Example
+
+```markdown
+If the target uses PostgreSQL, read `references/postgresql.md` for the database-specific setup steps. Continue from Step 5 in `SKILL.md` after completing that file.
+```
+
+Branch files should also end with a clear return condition:
+
+```markdown
+## Return
+
+Continue from Step 6 in `SKILL.md`.
+```
+
+or
+
+```markdown
+## Completion
+
+This branch completes the task. No steps remain in the trunk.
+```
+
+## 8. Failure model and escalation
+
+Failure must be classified into one of these categories.
+
+1. Expected result requiring corrective work
+   - The tool completed normally but reported defects that the task explicitly expects the agent to fix.
+   - Continue with the documented correction flow.
+
+2. Known failure
+   - The current instructions define the symptom and the recovery.
+   - Follow that recovery.
+
+3. Self-explanatory failure
+   - The output explicitly identifies the cause and the current instructions authorize the corresponding correction.
+   - Apply the correction without entering troubleshooting.
+
+4. Unknown or ambiguous failure
+   - The cause cannot be established from the current instructions and observable evidence.
+   - Stop speculative recovery and read the linked troubleshooting or escalation document.
+
+5. Fatal / escalation condition
+   - The procedure explicitly forbids automatic recovery.
+   - Stop and report or request approval.
+
+### Global troubleshooting trigger
+
+Use a deterministic trigger, not a judgment call such as "if it is unclear enough":
+
+```markdown
+If a step produces a documented failure class, follow its documented recovery.
+If the step produces a self-explanatory error and the instructions authorize the corresponding correction, apply it.
+Otherwise, stop and read `references/troubleshooting.md`.
+```
+
+This is more reliable than asking the agent to decide whether an error is "clear enough".
+
+### Troubleshooting model
+
+Troubleshooting files should follow this flow:
+
+`Symptom → diagnostic check → cause → recovery → return`
+
+Each troubleshooting entry should define:
+
+- the observable symptom;
+- the prerequisite state or tooling required for the check;
+- the exact diagnostic command or inspection;
+- the identified cause;
+- the recovery steps;
+- the return point.
+
+### Escalation payload
+
+When automatic execution must stop, report:
+
+- the step being executed;
+- the exact observed error or output;
+- relevant input or state;
+- what checks were already performed;
+- why the available instructions do not determine a safe next action.
+
+## 9. Validation is layered
+
+Use the smallest validation that proves the required property.
+
+### Validation levels
+
+1. Action validation: Did the command or action complete?
+2. State validation: Is the expected state now true?
+3. Semantic validation: Does the result actually satisfy the task requirement?
+4. Final validation: Does the entire task satisfy its acceptance criteria?
+
+Examples:
+
+- `git commit` exits successfully = action validation.
+- the commit exists = state validation.
+- the commit contains the intended changes = semantic validation.
+- repository checks pass = final validation.
+
+### Negative validation
+
+When correctness depends on an unwanted state not existing, validate absence explicitly.
+
+Examples:
+
+- no secrets committed;
+- no unrelated files changed;
+- no forbidden dependency added;
+- no production resource modified;
+- no stale generated file remains.
+
+## 10. Make side effects and approval gates explicit
+
+For mutating operations, state the following:
+
+- what will change;
+- what will not change;
+- whether the action is reversible;
+- whether approval is required;
+- whether repeated execution is safe.
+
+### Approval gates
+
+When an action is destructive, externally visible, costly, irreversible, or security-sensitive, define whether explicit human approval is required before execution.
+
+Do not infer authorization from the presence of the step in the instructions.
+
+## 11. Repeated execution, retries, and stale state
+
+### Repeated execution
+
+For steps that may be executed more than once, define one of:
+
+- idempotent: repeating the step produces the same final state;
+- guarded: check state before mutating;
+- one-time: stop if already completed;
+- retryable: safe to repeat after a failed attempt.
+
+Never leave repeated execution behavior implicit for consequential actions.
+
+### Retry rules
+
+When retrying an action, define:
+
+- the exact condition that permits retry;
+- the maximum number of retries;
+- what changes between attempts;
+- the condition that ends the loop;
+- what happens when retries are exhausted.
+
+Never imply "retry until it works" without a bounded rule.
+
+### Loop determinism
+
+Every loop must define:
+
+- the initial state;
+- the repeat condition;
+- the action in each iteration;
+- the state change between iterations;
+- the termination condition;
+- the maximum iteration count when termination cannot be guaranteed.
+
+### State freshness and concurrency
+
+When a step depends on mutable external state, define when that state must be refreshed.
+
+If another process may modify the same resource concurrently, specify the required consistency check before applying mutations.
+
+Example:
+
+```markdown
+Re-read the file after generation before applying a patch; do not rely on an earlier snapshot.
+```
+
+## 12. Rationale, normative language, and examples
+
+### Rationale
+
+Include rationale only when it prevents a predictable mistake or explains a non-obvious constraint.
+
+Keep rationale separate from the executable instruction when possible. Do not let rationale introduce additional requirements that are not expressed in the rule itself.
+
+### Normative strength
+
+Use a consistent normative model:
+
+- MUST / MUST NOT: mandatory requirement.
+- SHOULD / SHOULD NOT: default expectation unless a documented reason justifies deviation.
+- MAY: optional or allowed.
+- EXAMPLE: illustrative only, not normative.
+
+### Example boundaries
+
+Examples are never policy by default. Mark them clearly and keep them distinct from mandatory instructions.
+
+## 13. Authoring procedure
+
+Follow this sequence when creating or restructuring any instruction set.
+
+1. Identify the task and the real success condition.
+2. Define the trunk: the common successful path.
+3. Define the state model: preconditions, postconditions, invariants, idempotency.
+4. Identify all authoritative inputs and sources of truth.
+5. Normalize input representations before branching.
+6. Enumerate the decision points and define one explicit decision form for each.
+7. Identify branches and split only materially different flows.
+8. Define exactly when each branch or troubleshooting document is read.
+9. Add validation at the correct layer.
+10. Add recovery, retry, and escalation semantics only where they are required.
+11. Define approval gates for high-impact actions.
+12. Define the return point from every branch and recovery path.
+13. Run the review pass and test the instruction set against ambiguous cases.
+
+## 14. Review pass and test methodology
+
+Read the draft back as an agent executing the normal path and test the following.
+
+### Test 1: happy path
+
+Can an agent execute the task from start to finish without inventing steps?
+
+### Test 2: boundary cases
+
+Test missing input, empty input, invalid input, duplicate input, already-completed state, and partially-completed state.
+
+### Test 3: branch coverage
+
+For every branch:
+
+- does exactly one branch match;
+- can zero branches match;
+- can multiple branches match;
+- is the priority explicit if multiple matches are possible?
+
+### Test 4: failure coverage
+
+For each consequential action:
+
+- what is the expected failure;
+- what is the known failure;
+- what is the unknown failure;
+- where does execution go next?
+
+### Test 5: stop behavior
+
+Can the agent know when it must stop instead of continuing?
+
+### Test 6: restart behavior
+
+If the agent stops after step N and resumes later, is the correct next action obvious?
+
+### Test 7: adversarial interpretation
+
+Interpret ambiguous words in the most plausible alternative way and check whether the procedure still yields the same action.
+
+### Test 8: unnecessary-context test
+
+For each reference document, ask: could the agent complete the normal path without reading this file?
+
+If yes, the document is probably too broad or not effectively progressive.
+
+## 15. Anti-patterns to avoid
+
+- giant instruction files containing normal flow, every edge case, every alternate path, and all troubleshooting;
+- premature troubleshooting before the agent attempts the happy path;
+- unspecified branching or decision conditions;
+- hidden assumptions about environment, path, shell, or package manager;
+- arbitrary tool mandates when a capability-based rule would be clearer;
+- conditional links without a clear trigger;
+- self-triggering reference docs;
+- duplicate knowledge spread across files without a defined source of truth;
+- silent conflict resolution between competing sources;
+- retry loops without retries counts or stop conditions;
+- validation that checks only that an action ran, not whether the target state is correct;
+- decisions that leave the agent to guess the tie-breaker.
+
+## 16. Output format and examples
+
+Use this skill whenever you need to create, review, or restructure any of the following:
+
+- skills, prompts, system prompts, AGENTS.md, CLAUDE.md, and workflow docs;
+- AI-facing operational playbooks;
+- setup guides with environment-specific branches;
+- procedures with meaningful error handling;
+- instruction sets that have become tangled or nondeterministic.
+
+The standard structure is:
+
+```text
 [Main action step]
 
-→ If this step might fail and you need guidance, see [reference-file] for troubleshooting.
+→ If this step might fail and guidance is needed, see [reference-file] for [specific problem family].
 
 [Next main action step]
 
 → If [specific condition], read [conditional-file] for [specific scenario].
 ```
 
-**Example — database setup:**
+### Example: repository setup
 
+```markdown
+Install the project dependencies from the repository root.
+
+→ If the install fails due to a package resolution error, read `references/troubleshooting.md` and continue from the same step after the recovery.
+
+Create the environment file from the template if it is missing.
+
+→ If the project is configured for PostgreSQL, read `references/postgresql.md` and continue from Step 3 in this file.
 ```
-Install PostgreSQL.
 
-→ If installation fails, see references/troubleshooting/postgres-install.md for common issues.
+### Example: dependency selection
 
-Create the schema by reading `schema.sql` and running it against the database.
+```markdown
+Select the implementation by the following ranked criteria:
 
-→ If you're using MySQL instead, read references/alternative-tools/mysql-setup.md for the equivalent steps.
+1. exact package name match;
+2. same ecosystem;
+3. same project constraints;
+4. lexical name order.
+
+If no candidate satisfies the constraints, stop and report the conflict.
 ```
 
-Note the difference between a capability and a tool: "Create the schema" describes the outcome, but the deterministic version names the exact file and command. Prefer the explicit version whenever you can picture the concrete right answer (section 1).
+### Example: approval gate
 
-The ideal result behaves like an executable decision tree with progressive disclosure:
+```markdown
+Before deleting the production database snapshot, request explicit approval from the operator. Do not proceed without a confirmation token.
+```
+
+### Example: loop determinism
+
+```markdown
+Repeat this check while the status is `pending` and the retry count is below 5.
+On each retry, re-read the latest status from the source of truth.
+Stop after 5 attempts or when the status is no longer `pending`.
+```
+
+The ideal result is an executable decision tree with progressive disclosure:
 
 ```text
                     START
                       │
-                common path
+               common path
                       │
-             ┌────────┴────────┐
-             │                 │
-        normal result      condition occurs
-             │                 │
-           finish        read relevant branch
+          ┌───────────┴───────────┐
+          │                       │
+     normal result            conditional branch
+          │                       │
+       finish               read relevant branch
                                │
                          continue execution
 ```
 
-The agent reads the minimum information required to make the next correct decision.
+The agent should never need to guess what the next correct state, action, or validation point is.
