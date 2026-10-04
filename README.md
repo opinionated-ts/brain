@@ -26,7 +26,6 @@ For now, this package only contains skills for AI coding agents, which are:
 
 These skills are installable via `npx skills add opinionated-ts/brain`:
 
-- [`dependency-evaluation`](https://github.com/opinionated-ts/brain/tree/main/skills/dependency-evaluation) — Helps determine whether an external dependency is actually needed and, when it is, evaluates viable alternatives.
 - [`instruction-design`](https://github.com/opinionated-ts/brain/tree/main/skills/instruction-design) — Designs, writes, reviews, or restructures instructions that an AI will execute.
 
 ### Opinionated TS ecosystem skills
