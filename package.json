@@ -13,7 +13,7 @@
     "lint:fix": "oxlint --fix",
     "check": "bun fmt && bun lint && bun cspell",
     "fix": "bun fmt:fix && bun lint:fix",
-    "ai:sync": "bun run ./scripts/update-local/index.ts && bun uac generate",
+    "ai:sync": "bun run ./scripts/update-local/index.ts",
     "context-tree": "bun ai-context-tree",
     "hooks:install": "lefthook install"
   },
@@ -24,8 +24,7 @@
   "devDependencies": {
     "@opinionated-ts/config": "^1.8.8",
     "ai-context-tree": "^1.0.3",
-    "tsdown": "^0.23.0",
-    "universal-ai-config": "^2.2.1"
+    "tsdown": "^0.23.0"
   },
   "peerDependencies": {
     "typescript": "^7.0.2"
